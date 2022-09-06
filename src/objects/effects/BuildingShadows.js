@@ -12,6 +12,13 @@ class BuildingShadows {
 	}
 	onAdd(map, gl) {
 		this.map = map;
+		// find layer source
+		const sourceName = this.map.getLayer(this.buildingsLayerId).source;
+		this.source = (this.map.style.sourceCaches || this.map.style._otherSourceCaches)[sourceName];
+		if (!this.source) {
+			console.warn(`Can't find layer ${this.buildingsLayerId}'s source.`);
+		}
+
 		const vertexSource = `
 			uniform mat4 u_matrix;
 			uniform float u_height_factor;
@@ -59,9 +66,10 @@ class BuildingShadows {
 		this.aHeight = gl.getAttribLocation(this.program, "a_height");
 	}
 	render(gl, matrix) {
+		if (!this.source) return;
+
 		gl.useProgram(this.program);
-		const source = this.map.style.sourceCaches['composite'];
-		const coords = source.getVisibleCoordinates().reverse();
+		const coords = this.source.getVisibleCoordinates().reverse();
 		const buildingsLayer = this.map.getLayer(this.buildingsLayerId);
 		const context = this.map.painter.context;
 		const { lng, lat } = this.map.getCenter();
@@ -77,7 +85,7 @@ class BuildingShadows {
 		//gl.blendEquation(gl.FUNC_ADD);
 		gl.disable(gl.DEPTH_TEST);
 		for (const coord of coords) {
-			const tile = source.getTile(coord);
+			const tile = this.source.getTile(coord);
 			const bucket = tile.getBucket(buildingsLayer);
 			if (!bucket) continue;
 			const [heightBuffer, baseBuffer] = bucket.programConfigurations.programConfigurations[this.buildingsLayerId]._buffers;
