@@ -77,7 +77,7 @@ class BuildingShadows {
 			const bucket = tile.getBucket(buildingsLayer);
 			if (!bucket) continue;
 			const [heightBuffer, baseBuffer] = bucket.programConfigurations.programConfigurations[this.buildingsLayerId]._buffers;
-			gl.uniformMatrix4fv(this.uMatrix, false, coord.posMatrix);
+			gl.uniformMatrix4fv(this.uMatrix, false, (coord.posMatrix || coord.projMatrix));
 			gl.uniform1f(this.uHeightFactor, Math.pow(2, coord.overscaledZ) / tile.tileSize / 8);
 			for (const segment of bucket.segments.get()) {
 				const numPrevAttrib = context.currentNumAttributes || 0;
