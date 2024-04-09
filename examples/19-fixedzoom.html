@@ -145,8 +145,10 @@
 		}
 
 		function changeScale() {
+			console.log(plane)
 			plane.fixedZoom = (api.fixedZoom ? api.maxZoom : null);
 			plane.setObjectScale(map.transform.scale);
+			console.log(plane)
 			tb.map.repaint = true;
 		}
 

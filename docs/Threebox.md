@@ -1162,7 +1162,7 @@ Internally this method uses a `CSS2DObject` rendered by [`THREE.CSS2DRenderer`](
 | option | required | default | type   | description                                                                                  |
 |-----------|----------|---------|--------|-------|
 | `text`    | yes       | ""      | string | String that will be used to rendered as a `CSS2DObject` |
-| `cssClass`    | no       | "toolTip text-xs"      | string | CssClass that will be aggregated to manage the styles of the label object. |
+| `cssClass`    | no       | "three-box-tooltip text-xs"      | string | CssClass that will be aggregated to manage the styles of the label object. |
 | `mapboxStyle`     | no       | false   | int  | If `mapboxStyle` is true, it applies the same styles the *Mapbox GL* popups. |                                                                            
 | `topMargin`     | no       | 0   | int  | If `topMargin` is defined in number, it will be added to it's vertical position in units, where 1 is the object height. By default a label will be positioned on top of the object (`topMargin: 0`)|                                
 | `feature`     | no       | null   | [*GeoJson*](https://geojson.org/) feature  | [*GeoJson*](https://geojson.org/) feature to assign to the tooltip. It'll be used for dynamic positioning |                                                                            

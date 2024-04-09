@@ -1031,7 +1031,7 @@ Objects.prototype = {
 
 		tooltip: {
 			text: '',
-			cssClass: 'toolTip text-xs',
+			cssClass: 'three-box-tooltip text-xs',
 			mapboxStyle: false,
 			topMargin: 0
 		},

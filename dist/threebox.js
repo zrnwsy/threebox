@@ -299,7 +299,6 @@ Threebox.prototype = {
   repaint: function () {
     this.map.repaint = true;
   },
-
   /**
    * Threebox constructor init method
    * @param {mapboxgl.map} map
@@ -314,7 +313,8 @@ Threebox.prototype = {
     this.map.tb = this; //[jscastro] needed if we want to queryRenderedFeatures from map.onload
 
     this.objects = new Objects();
-
+    this.objectInitState = null
+    this.defaultCoords = []
     this.mapboxVersion = parseFloat(this.map.version);
 
     // Set up a THREE.js scene
@@ -366,6 +366,12 @@ Threebox.prototype = {
     this.gridStep = 6; // decimals to adjust the lnglat grid step, 6 = 11.1cm
     this.altitudeStep = 0.1; // 1px = 0.1m = 10cm
     this.defaultCursor = "default";
+    /**
+     * 在threebox中，存在刻度变量如this.altitudeStep、this.rotationStep、this.scaleStep等常量，用于键盘+鼠标操作，效果很好；
+     * 但由于增加了纯键盘按键的组合键操作中，使用以上刻度，刻度过大，操作起来调整效果不好，所以以下增加新的常量；
+     */
+    this.keyboardMoveStep = 0.00001;
+    this.keyboardHeightStep = 0.1;
 
     this.lights = this.initLights;
     if (this.options.defaultLights) this.defaultLights();
@@ -564,6 +570,7 @@ Threebox.prototype = {
             if (this.selectedFeature) {
               this.unselectFeature(this.selectedFeature);
             }
+
             //if not selected yet, select it
             if (!this.selectedObject) {
               this.selectedObject = nearestObject;
@@ -652,9 +659,17 @@ Threebox.prototype = {
             ),
           };
           //now rotate the model depending the axis
+          console.log(
+            "角度--->",
+            // obj,
+            // this.tb,
+            // this.tb.rotationStep,
+            // obj.rotation,
+            rotation
+          );
           this.draggedObject.setRotation(rotation);
           if (map.tb.enableHelpTooltips)
-            this.draggedObject.addHelp("rot: " + rotation.z + "&#176;");
+            this.draggedObject.addHelp("旋转角度: " + rotation.z + "&#176;");
           //this.draggedObject.setRotationAxis(rotation);
           return;
         }
@@ -662,7 +677,6 @@ Threebox.prototype = {
         //check if being moved
         if (e.originalEvent.ctrlKey && this.draggedObject) {
           if (!map.tb.enableDraggingObjects) return;
-          console.log("___", this.draggedObject, e.originalEvent.ctrlKey);
           draggedAction = "translate";
           // Set a UI indicator for dragging.
           this.getCanvasContainer().style.cursor = "move";
@@ -676,7 +690,8 @@ Threebox.prototype = {
           this.draggedObject.setCoords(options);
           if (map.tb.enableHelpTooltips)
             this.draggedObject.addHelp(
-              "lng: " + options[0] + "&#176;, lat: " + options[1] + "&#176;"
+              // "lng: " + options[0] + "&#176;, lat: " + options[1] + "&#176;"
+              "经纬度: " + e.lngLat.lng + ", " + e.lngLat.lat
             );
           return;
         }
@@ -689,14 +704,18 @@ Threebox.prototype = {
           this.getCanvasContainer().style.cursor = "move";
           // Capture the first xy coordinates, height must be the same to move on the same plane
           let now = e.point.y * this.tb.altitudeStep;
+          let groundClearance = Number(
+            (-now - altDiff).toFixed(this.tb.gridStep)
+          );
+          groundClearance = groundClearance < 0 ? 0 : groundClearance; // 离地间隙，如果是负值，模型就在地图底下看不见了，所以此处限制一下
           let options = [
             this.draggedObject.coordinates[0],
             this.draggedObject.coordinates[1],
-            Number((-now - altDiff).toFixed(this.tb.gridStep)),
+            groundClearance,
           ];
           this.draggedObject.setCoords(options);
           if (map.tb.enableHelpTooltips)
-            this.draggedObject.addHelp("alt: " + options[2] + "m");
+            this.draggedObject.addHelp("离地高度: " + options[2] + "m");
           return;
         }
 
@@ -782,8 +801,7 @@ Threebox.prototype = {
       };
 
       this.onMouseDown = function (e) {
-        console.log("onMouseDown--->", e);
-
+        // console.log("onMouseDown--->", e);
         // Continue the rest of the function shiftkey or altkey are pressed, and if object is selected
         if (
           !(
@@ -821,29 +839,6 @@ Threebox.prototype = {
         latDiff = startCoords[1] - e.lngLat.lat;
         altDiff =
           -this.draggedObject.modelHeight - e.point.y * this.tb.altitudeStep;
-        console.log("onMouseDown--->2", e);
-
-        //
-        // if (e.originalEvent.ctrlKey && this.draggedObject) {
-        //   if (!map.tb.enableDraggingObjects) return;
-        //   console.log("___", this.draggedObject, e.originalEvent.ctrlKey);
-        //   draggedAction = "translate";
-        //   // Set a UI indicator for dragging.
-        //   this.getCanvasContainer().style.cursor = "move";
-        //   // Capture the first xy coordinates, height must be the same to move on the same plane
-        //   let coords = e.lngLat;
-        //   let options = [
-        //     Number((coords.lng + lngDiff).toFixed(this.tb.gridStep)),
-        //     Number((coords.lat + latDiff).toFixed(this.tb.gridStep)),
-        //     this.draggedObject.modelHeight,
-        //   ];
-        //   this.draggedObject.setCoords(options);
-        //   if (map.tb.enableHelpTooltips)
-        //     this.draggedObject.addHelp(
-        //       "lng: " + options[0] + "&#176;, lat: " + options[1] + "&#176;"
-        //     );
-        //   return;
-        // }
       };
 
       this.onMouseUp = function (e) {
@@ -890,25 +885,53 @@ Threebox.prototype = {
 
       let altDown = false;
       let ctrlDown = false;
+      let shiftDown = false;
+      let rDown = false;
 
-      //   - 16：Shift键
+      // (1)ctrl+←/→/鼠标水平移动：实现模型水平方向移动
+      // (2)alt+↑/↓/鼠标竖直移动：实现模型竖直方向移动
+      // (3)shift+←/→/鼠标水平移动：实现模型水平方向旋转
+      // (4)ctrl+shift+↑/↓/鼠标竖直移动：实现模型大小变化
+      // (5)ctrl+shift+R：重置模型初始状态
+
       //   - 91：Command键（在Mac系统上为Command键，在Windows系统上为Windows键）
-      //   - 17：Ctrl键
-      //   - 83：S键
-      //   - 68：D键
-
       // let con = 17, cmdKey = 91, altKey = 16, sK = 83, dK = 68;
       let altKey = 18,
         cmdKey = 91,
         ctrlKey = 17,
+        shiftKey = 16,
         sK = 83,
         dK = 68;
+      arrowUpKey = 38;
+      arrowDownKey = 40;
+      arrowLeftKey = 37;
+      arrowRightKey = 39;
+      rKey = 82;
+
+      let isShowingMessage = false;
+      let keyboardTimerId = null;
+      const keyboardTimerDelay = 1000;
+
+      // 禁用浏览器的一些组合键
+      document.onkeydown = function (event) {
+        if (event.ctrlKey && event.shiftKey && window.event.keyCode == 82) {
+          // 禁用ctrl + shift + R 组合键
+          return false;
+        }
+      };
 
       function onKeyDown(e) {
-        console.log(e);
+
+        // console.log(e);
         if (e.which === altKey || e.which === cmdKey) altDown = true;
         if (e.which === ctrlKey) ctrlDown = true;
+        if (e.which === rKey) rDown = true;
+        if (e.which === shiftKey) shiftDown = true;
         let obj = this.selectedObject;
+ // 记住当前操作的模型的初始状态数据，用于重置操作
+        if(!this.tb.objectInitState) {
+          this.tb.objectInitState = {...obj}
+    }
         if (ctrlDown && e.which === sK && obj) {
           //shift + sS
           let dc = utils.toDecimal;
@@ -939,12 +962,147 @@ Threebox.prototype = {
             obj.removeHelp();
           }
           return false;
+        } else if (
+          ctrlDown &&
+          !shiftDown &&
+          (e.which === arrowUpKey ||
+            e.which === arrowDownKey ||
+            e.which === arrowLeftKey ||
+            e.which === arrowRightKey)
+        ) {
+          startCoords = obj.coordinates;
+          const xStep =
+            e.which === arrowLeftKey
+              ? -this.tb.keyboardMoveStep
+              : e.which === arrowRightKey
+              ? this.tb.keyboardMoveStep
+              : 0;
+          const yStep =
+            e.which === arrowUpKey
+              ? this.tb.keyboardMoveStep
+              : e.which === arrowDownKey
+              ? -this.tb.keyboardMoveStep
+              : 0;
+          let options = [
+            Number((xStep + obj.coordinates[0]).toFixed(this.tb.gridStep)),
+            Number((yStep + obj.coordinates[1]).toFixed(this.tb.gridStep)),
+            obj.modelHeight,
+          ];
+          obj.setCoords(options);
+          if (map.tb.enableHelpTooltips) {
+            // 如果正在显示提示，则清除当前定时器并标记为不在显示
+            if (isShowingMessage) {
+              clearTimeout(keyboardTimerId);
+              isShowingMessage = false;
+            }
+            obj.addHelp(
+              "经纬度: " + obj.coordinates[0] + "," + obj.coordinates[1]
+            );
+            // 计划在 1 秒后隐藏提示文字
+            keyboardTimerId = setTimeout(() => {
+              obj.removeHelp();
+              isShowingMessage = false; // 标记为不在显示
+            }, keyboardTimerDelay);
+            isShowingMessage = true;
+          }
+        } else if (
+          altDown &&
+          (e.which === arrowUpKey || e.which === arrowDownKey)
+        ) {
+          const groundClearanceStep =
+            e.which === arrowUpKey
+              ? this.tb.keyboardHeightStep
+              : -this.tb.keyboardHeightStep;
+          let newHight = Number(
+            (obj.modelHeight + groundClearanceStep).toFixed(this.tb.gridStep)
+          );
+          newHight = newHight > 0 ? newHight : 0;
+          let options = [obj.coordinates[0], obj.coordinates[1], newHight];
+          obj.setCoords(options);
+          if (map.tb.enableHelpTooltips) {
+            if (isShowingMessage) {
+              clearTimeout(keyboardTimerId);
+              isShowingMessage = false;
+            }
+            obj.addHelp("离地高度: " + obj.coordinates[2] + "m");
+            keyboardTimerId = setTimeout(() => {
+              obj.removeHelp();
+              isShowingMessage = false;
+            }, keyboardTimerDelay);
+            isShowingMessage = true;
+          }
+        } else if (
+          !ctrlDown &&
+          shiftDown &&
+          (e.which === arrowLeftKey || e.which === arrowRightKey)
+        ) {
+          const rotationDiff = utils.degreeify(obj.rotation);
+          const rotateStep = e.which === arrowLeftKey ? -this.tb.rotationStep : this.tb.rotationStep;
+          let rotation = {
+            x: 0,
+            y: 0,
+            z: rotationDiff[2] + rotateStep,
+          };
+          obj.setRotation(rotation);
+          if (map.tb.enableHelpTooltips) {
+            if (isShowingMessage) {
+              clearTimeout(keyboardTimerId);
+              isShowingMessage = false;
+            }
+            obj.addHelp("旋转角度: " + Math.round(rotationDiff[2] + rotateStep) + "&#176;");
+            keyboardTimerId = setTimeout(() => {
+              obj.removeHelp();
+              isShowingMessage = false;
+            }, keyboardTimerDelay);
+            isShowingMessage = true;
+          }
+        } else if (
+          ctrlDown &&
+          shiftDown &&
+          (e.which === arrowUpKey || e.which === arrowDownKey)
+        ) {
+          const scaleValue = {
+            x:obj.scale.x + 0.1, y:obj.scale.y + 0.1, z:obj.scale.z + 0.1
+          };
+          // obj.fixedZoom = 100;
+          // console.log("大小--->", obj,obj.scale, this.tb.scale);\
+          console.log("大小--->", map.transform.scale);
+          const scaleStep = e.which === arrowUpKey ? 0.01: -0.01
+          obj.fixedZoom = 18;
+          obj.setObjectScale(map.transform.scale +scaleStep);
+          this.tb.map.repaint = true;
+          // obj.setObjectScale(obj.scale.x + 1);
+          // obj.model.setObjectScale(obj.scale.x + 1);
+          // model.scale.set(2, 2, 2);
+          // obj.setObjectScale(scaleValue);
+          // obj.set({scale:scaleValue})
+          // if (map.tb.enableHelpTooltips) {
+          //   if (isShowingMessage) {
+          //     clearTimeout(keyboardTimerId);
+          //     isShowingMessage = false;
+          //   }
+          //   obj.addHelp("缩放大小: " + scaleValue);
+          //   keyboardTimerId = setTimeout(() => {
+          //     obj.removeHelp();
+          //     isShowingMessage = false;
+          //   }, keyboardTimerDelay);
+          //   isShowingMessage = true;
+          // }
+        } else if (ctrlDown && shiftDown && rDown) {
+          console.log("重置初始化--->11", this.tb.objectInitState);
+          // obj.scale.set(1, 1, 1);
+          obj.rotation.set(0, 0, 0);
+          // obj.rotation.set(this.tb.defaultOptions.rotation.x, this.tb.defaultOptions.rotation.y, this.tb.defaultOptions.rotation.z);
+          // obj.setCoords([lng, lat, alt]);
+          this.tb.map.repaint = true;
         }
       }
 
       function onKeyUp(e) {
         if (e.which == altKey || e.which == cmdKey) altDown = false;
         if (e.which === ctrlKey) ctrlDown = false;
+        if (e.which === rKey) rDown = false;
+        if (e.which === shiftKey) shiftDown = false;
       }
 
       //listener to the events
@@ -1147,6 +1305,7 @@ Threebox.prototype = {
   },
 
   loadObj: async function loadObj(options, cb) {
+    this.defaultOptions = options
     this.setDefaultView(options, this.options);
     if (options.clone === false) {
       return new Promise(async (resolve) => {
@@ -1581,7 +1740,7 @@ Threebox.prototype = {
 
   //[jscastro] method to fully dispose the resources, watch out is you call this without navigating to other page
   dispose: async function () {
-    console.log(this.memory());
+    // console.log(this.memory());
     //console.log(window.performance.memory);
 
     return new Promise((resolve) => {
@@ -1594,7 +1753,7 @@ Threebox.prototype = {
           this.world = null;
           this.objectsCache.clear();
           this.labelRenderer.dispose();
-          console.log(this.memory());
+          // console.log(this.memory());
           this.renderer.dispose();
           return resolve;
         })
@@ -18446,7 +18605,7 @@ Objects.prototype = {
 
 		tooltip: {
 			text: '',
-			cssClass: 'toolTip text-xs',
+			cssClass: 'three-box-tooltip text-xs',
 			mapboxStyle: false,
 			topMargin: 0
 		},
