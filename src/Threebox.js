@@ -43,8 +43,6 @@ Threebox.prototype = {
     this.map.tb = this; //[jscastro] needed if we want to queryRenderedFeatures from map.onload
 
     this.objects = new Objects();
-    this.objectInitState = null
-    this.defaultCoords = []
     this.mapboxVersion = parseFloat(this.map.version);
 
     // Set up a THREE.js scene
@@ -100,7 +98,7 @@ Threebox.prototype = {
      * 在threebox中，存在刻度变量如this.altitudeStep、this.rotationStep、this.scaleStep等常量，用于键盘+鼠标操作，效果很好；
      * 但由于增加了纯键盘按键的组合键操作中，使用以上刻度，刻度过大，操作起来调整效果不好，所以以下增加新的常量；
      */
-    this.keyboardMoveStep = 0.00001;
+    this.keyboardMoveStep = 0.001;
     this.keyboardHeightStep = 0.1;
 
     this.lights = this.initLights;
@@ -119,6 +117,8 @@ Threebox.prototype = {
     this.enableTooltips = this.options.enableTooltips || false;
     this.multiLayer = this.options.multiLayer || false;
     this.enableHelpTooltips = this.options.enableHelpTooltips || false;
+
+
 
     this.map.on("style.load", function () {
       this.tb.zoomLayers = [];
@@ -164,6 +164,7 @@ Threebox.prototype = {
       let draggedAction; //dragged action to notify frontend
       this.overedObject; //overed object through mouseover
       this.overedFeature; //overed state for extrusion layer features
+      let objectsFirstState = {}
 
       let canvas = this.getCanvasContainer();
       this.getCanvasContainer().style.cursor = this.tb.defaultCursor;
@@ -186,6 +187,27 @@ Threebox.prototype = {
           x: e.originalEvent.clientX - rect.left - canvas.clientLeft,
           y: e.originalEvent.clientY - rect.top - canvas.clientTop,
         };
+      }
+
+
+      function rememberModelsFirstSate(uuid, operateKey, value) {
+        console.log("---rememberModelsFirstSate-", objectsFirstState, uuid, operateKey, value)
+
+        if(objectsFirstState[uuid] && objectsFirstState[uuid][operateKey]) {
+          if(operateKey === 'rotation') {
+            objectsFirstState[uuid][operateKey] = value;
+          }
+          return;
+        }
+        if(objectsFirstState[uuid] && !objectsFirstState[uuid][operateKey]) {
+          objectsFirstState[uuid][operateKey] = value;
+          return;
+        }
+        objectsFirstState = {
+          [uuid]: {
+            [operateKey]: value
+          }
+        }
       }
 
       this.unselectObject = function () {
@@ -362,6 +384,8 @@ Threebox.prototype = {
         }
       };
 
+      
+
       this.onMouseMove = function (e) {
         // Capture the ongoing xy coordinates
         let current = mousePos(e);
@@ -398,6 +422,7 @@ Threebox.prototype = {
             rotation
           );
           this.draggedObject.setRotation(rotation);
+          rememberModelsFirstSate(this.draggedObject.uuid, "rotation", rotation)
           if (map.tb.enableHelpTooltips)
             this.draggedObject.addHelp("旋转角度: " + rotation.z + "&#176;");
           //this.draggedObject.setRotationAxis(rotation);
@@ -417,7 +442,10 @@ Threebox.prototype = {
             Number((coords.lat + latDiff).toFixed(this.tb.gridStep)),
             this.draggedObject.modelHeight,
           ];
+          // console.log(options,"setCoords-------")
           this.draggedObject.setCoords(options);
+          rememberModelsFirstSate(this.draggedObject.uuid, "coordinates", [options[0], options[1]])
+
           if (map.tb.enableHelpTooltips)
             this.draggedObject.addHelp(
               // "lng: " + options[0] + "&#176;, lat: " + options[1] + "&#176;"
@@ -425,7 +453,8 @@ Threebox.prototype = {
             );
           return;
         }
-
+        // [-8.629135, 41.157902, 0]
+        // [-8.629134, 41.157902, 0]
         //check if being moved on altitude
         if (e.originalEvent.altKey && this.draggedObject) {
           if (!map.tb.enableDraggingObjects) return;
@@ -443,6 +472,7 @@ Threebox.prototype = {
             this.draggedObject.coordinates[1],
             groundClearance,
           ];
+          rememberModelsFirstSate(this.draggedObject.uuid, "height", groundClearance)
           this.draggedObject.setCoords(options);
           if (map.tb.enableHelpTooltips)
             this.draggedObject.addHelp("离地高度: " + options[2] + "m");
@@ -638,6 +668,8 @@ Threebox.prototype = {
       arrowRightKey = 39;
       rKey = 82;
 
+      let maxZoom = 15
+
       let isShowingMessage = false;
       let keyboardTimerId = null;
       const keyboardTimerDelay = 1000;
@@ -650,18 +682,14 @@ Threebox.prototype = {
         }
       };
 
-      function onKeyDown(e) {
 
-        // console.log(e);
+
+      function onKeyDown(e) {
         if (e.which === altKey || e.which === cmdKey) altDown = true;
         if (e.which === ctrlKey) ctrlDown = true;
         if (e.which === rKey) rDown = true;
         if (e.which === shiftKey) shiftDown = true;
         let obj = this.selectedObject;
- // 记住当前操作的模型的初始状态数据，用于重置操作
-        if(!this.tb.objectInitState) {
-          this.tb.objectInitState = {...obj}
-    }
         if (ctrlDown && e.which === sK && obj) {
           //shift + sS
           let dc = utils.toDecimal;
@@ -718,6 +746,7 @@ Threebox.prototype = {
             Number((yStep + obj.coordinates[1]).toFixed(this.tb.gridStep)),
             obj.modelHeight,
           ];
+          rememberModelsFirstSate(obj.uuid, "coordinates", [options[0], options[1]])
           obj.setCoords(options);
           if (map.tb.enableHelpTooltips) {
             // 如果正在显示提示，则清除当前定时器并标记为不在显示
@@ -748,6 +777,7 @@ Threebox.prototype = {
           );
           newHight = newHight > 0 ? newHight : 0;
           let options = [obj.coordinates[0], obj.coordinates[1], newHight];
+          rememberModelsFirstSate(obj.uuid, "height", newHight)
           obj.setCoords(options);
           if (map.tb.enableHelpTooltips) {
             if (isShowingMessage) {
@@ -774,6 +804,7 @@ Threebox.prototype = {
             z: rotationDiff[2] + rotateStep,
           };
           obj.setRotation(rotation);
+          rememberModelsFirstSate(obj.uuid, "rotation", rotation)
           if (map.tb.enableHelpTooltips) {
             if (isShowingMessage) {
               clearTimeout(keyboardTimerId);
@@ -795,12 +826,13 @@ Threebox.prototype = {
             x:obj.scale.x + 0.1, y:obj.scale.y + 0.1, z:obj.scale.z + 0.1
           };
           // obj.fixedZoom = 100;
-          // console.log("大小--->", obj,obj.scale, this.tb.scale);\
-          console.log("大小--->", map.transform.scale);
-          const scaleStep = e.which === arrowUpKey ? 0.01: -0.01
-          obj.fixedZoom = 18;
-          obj.setObjectScale(map.transform.scale +scaleStep);
-          this.tb.map.repaint = true;
+          // console.log("大小--->", obj,obj.scale, this.tb.scale);
+          const scaleStep = e.which === arrowUpKey ? 1: -1
+          maxZoom = maxZoom + scaleStep;
+          obj.fixedZoom = maxZoom;
+          // console.log("大小--->", maxZoom, obj.fixedZoom, map.transform.scale);
+          console.log("大小--->", obj.userData.maxZoom);
+          obj.setObjectScale(map.transform.scale);
           // obj.setObjectScale(obj.scale.x + 1);
           // obj.model.setObjectScale(obj.scale.x + 1);
           // model.scale.set(2, 2, 2);
@@ -818,12 +850,26 @@ Threebox.prototype = {
           //   }, keyboardTimerDelay);
           //   isShowingMessage = true;
           // }
+          this.tb.map.repaint = true;
+
         } else if (ctrlDown && shiftDown && rDown) {
-          console.log("重置初始化--->11", this.tb.objectInitState);
+          const defaultOption = objectsFirstState[obj.uuid]
+          console.log("重置初始化--->11", defaultOption);
+          if(!defaultOption)return;
           // obj.scale.set(1, 1, 1);
-          obj.rotation.set(0, 0, 0);
+          // obj.rotation.set(defaultOption.rotation.x, defaultOption.rotation.y, defaultOption.rotation.z);
           // obj.rotation.set(this.tb.defaultOptions.rotation.x, this.tb.defaultOptions.rotation.y, this.tb.defaultOptions.rotation.z);
-          // obj.setCoords([lng, lat, alt]);
+        
+          // obj.fixedZoom = maxZoom;
+          // // console.log("大小--->", maxZoom, obj.fixedZoom, map.transform.scale);
+          // console.log("大小--->", obj.userData.maxZoom);
+          // obj.setObjectScale(map.transform.scale);
+          const rr = {
+            // x: 90, y: 0, z: 0 
+            x:0, y:0, z: -defaultOption.rotation.z + 360
+          }
+          defaultOption.rotation && obj.setRotation(rr)
+          obj.setCoords([defaultOption?.coordinates?.[0]||0, defaultOption?.coordinates?.[1]||0, defaultOption?.height || 0]);
           this.tb.map.repaint = true;
         }
       }

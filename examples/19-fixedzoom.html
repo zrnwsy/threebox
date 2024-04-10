@@ -144,11 +144,12 @@
 			if (api.pan) map.panTo(model.coordinates);
 		}
 
-		function changeScale() {
-			console.log(plane)
+		function changeScale(e) {
+			console.log('1----',plane.scale, e,api.maxZoom, plane.fixedZoom, map.transform.scale)
 			plane.fixedZoom = (api.fixedZoom ? api.maxZoom : null);
 			plane.setObjectScale(map.transform.scale);
-			console.log(plane)
+			// console.log(plane)
+			// console.log('1----',e,api.maxZoom, map.transform.scale)
 			tb.map.repaint = true;
 		}
 
