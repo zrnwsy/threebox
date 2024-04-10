@@ -864,11 +864,13 @@ Threebox.prototype = {
           // // console.log("大小--->", maxZoom, obj.fixedZoom, map.transform.scale);
           // console.log("大小--->", obj.userData.maxZoom);
           // obj.setObjectScale(map.transform.scale);
-          const rr = {
-            // x: 90, y: 0, z: 0 
-            x:0, y:0, z: -defaultOption.rotation.z + 360
-          }
-          defaultOption.rotation && obj.setRotation(rr)
+          defaultOption.rotation && obj.setRotation(0
+          //   {
+          //   // x: 90, y: 0, z: 0 
+          //   // x:0, y:0, z: -defaultOption.rotation.z + 360
+          //   x:0, y:0, z: 0
+          // }
+          )
           obj.setCoords([defaultOption?.coordinates?.[0]||0, defaultOption?.coordinates?.[1]||0, defaultOption?.height || 0]);
           this.tb.map.repaint = true;
         }
