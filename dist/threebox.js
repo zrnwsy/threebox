@@ -388,8 +388,6 @@ Threebox.prototype = {
     this.multiLayer = this.options.multiLayer || false;
     this.enableHelpTooltips = this.options.enableHelpTooltips || false;
 
-
-
     this.map.on("style.load", function () {
       this.tb.zoomLayers = [];
       //[jscastro] if multiLayer, create a by default layer in the map, so tb.update won't be needed in client side to avoid duplicating calls to render
@@ -434,7 +432,7 @@ Threebox.prototype = {
       let draggedAction; //dragged action to notify frontend
       this.overedObject; //overed object through mouseover
       this.overedFeature; //overed state for extrusion layer features
-      let objectsFirstState = {}
+      let objectsFirstState = {};
 
       let canvas = this.getCanvasContainer();
       this.getCanvasContainer().style.cursor = this.tb.defaultCursor;
@@ -459,25 +457,30 @@ Threebox.prototype = {
         };
       }
 
-
       function rememberModelsFirstSate(uuid, operateKey, value) {
-        console.log("---rememberModelsFirstSate-", objectsFirstState, uuid, operateKey, value)
+        console.log(
+          "---rememberModelsFirstSate-",
+          objectsFirstState,
+          uuid,
+          operateKey,
+          value
+        );
 
-        if(objectsFirstState[uuid] && objectsFirstState[uuid][operateKey]) {
-          if(operateKey === 'rotation') {
+        if (objectsFirstState[uuid] && objectsFirstState[uuid][operateKey]) {
+          if (operateKey === "rotation") {
             objectsFirstState[uuid][operateKey] = value;
           }
           return;
         }
-        if(objectsFirstState[uuid] && !objectsFirstState[uuid][operateKey]) {
+        if (objectsFirstState[uuid] && !objectsFirstState[uuid][operateKey]) {
           objectsFirstState[uuid][operateKey] = value;
           return;
         }
         objectsFirstState = {
           [uuid]: {
-            [operateKey]: value
-          }
-        }
+            [operateKey]: value,
+          },
+        };
       }
 
       this.unselectObject = function () {
@@ -654,8 +657,6 @@ Threebox.prototype = {
         }
       };
 
-      
-
       this.onMouseMove = function (e) {
         // Capture the ongoing xy coordinates
         let current = mousePos(e);
@@ -692,7 +693,11 @@ Threebox.prototype = {
             rotation
           );
           this.draggedObject.setRotation(rotation);
-          rememberModelsFirstSate(this.draggedObject.uuid, "rotation", rotation)
+          rememberModelsFirstSate(
+            this.draggedObject.uuid,
+            "rotation",
+            rotation
+          );
           if (map.tb.enableHelpTooltips)
             this.draggedObject.addHelp("旋转角度: " + rotation.z + "&#176;");
           //this.draggedObject.setRotationAxis(rotation);
@@ -714,7 +719,10 @@ Threebox.prototype = {
           ];
           // console.log(options,"setCoords-------")
           this.draggedObject.setCoords(options);
-          rememberModelsFirstSate(this.draggedObject.uuid, "coordinates", [options[0], options[1]])
+          rememberModelsFirstSate(this.draggedObject.uuid, "coordinates", [
+            options[0],
+            options[1],
+          ]);
 
           if (map.tb.enableHelpTooltips)
             this.draggedObject.addHelp(
@@ -742,7 +750,11 @@ Threebox.prototype = {
             this.draggedObject.coordinates[1],
             groundClearance,
           ];
-          rememberModelsFirstSate(this.draggedObject.uuid, "height", groundClearance)
+          rememberModelsFirstSate(
+            this.draggedObject.uuid,
+            "height",
+            groundClearance
+          );
           this.draggedObject.setCoords(options);
           if (map.tb.enableHelpTooltips)
             this.draggedObject.addHelp("离地高度: " + options[2] + "m");
@@ -938,7 +950,8 @@ Threebox.prototype = {
       arrowRightKey = 39;
       rKey = 82;
 
-      let maxZoom = 15
+      const maxZoom = 16; // 这个大小由地图缩放比例决定
+      let scaleZ;
 
       let isShowingMessage = false;
       let keyboardTimerId = null;
@@ -951,8 +964,6 @@ Threebox.prototype = {
           return false;
         }
       };
-
-
 
       function onKeyDown(e) {
         if (e.which === altKey || e.which === cmdKey) altDown = true;
@@ -1016,7 +1027,10 @@ Threebox.prototype = {
             Number((yStep + obj.coordinates[1]).toFixed(this.tb.gridStep)),
             obj.modelHeight,
           ];
-          rememberModelsFirstSate(obj.uuid, "coordinates", [options[0], options[1]])
+          rememberModelsFirstSate(obj.uuid, "coordinates", [
+            options[0],
+            options[1],
+          ]);
           obj.setCoords(options);
           if (map.tb.enableHelpTooltips) {
             // 如果正在显示提示，则清除当前定时器并标记为不在显示
@@ -1047,7 +1061,7 @@ Threebox.prototype = {
           );
           newHight = newHight > 0 ? newHight : 0;
           let options = [obj.coordinates[0], obj.coordinates[1], newHight];
-          rememberModelsFirstSate(obj.uuid, "height", newHight)
+          rememberModelsFirstSate(obj.uuid, "height", newHight);
           obj.setCoords(options);
           if (map.tb.enableHelpTooltips) {
             if (isShowingMessage) {
@@ -1067,20 +1081,25 @@ Threebox.prototype = {
           (e.which === arrowLeftKey || e.which === arrowRightKey)
         ) {
           const rotationDiff = utils.degreeify(obj.rotation);
-          const rotateStep = e.which === arrowLeftKey ? -this.tb.rotationStep : this.tb.rotationStep;
+          const rotateStep =
+            e.which === arrowLeftKey
+              ? -this.tb.rotationStep
+              : this.tb.rotationStep;
           let rotation = {
             x: 0,
             y: 0,
             z: rotationDiff[2] + rotateStep,
           };
           obj.setRotation(rotation);
-          rememberModelsFirstSate(obj.uuid, "rotation", rotation)
+          rememberModelsFirstSate(obj.uuid, "rotation", rotation);
           if (map.tb.enableHelpTooltips) {
             if (isShowingMessage) {
               clearTimeout(keyboardTimerId);
               isShowingMessage = false;
             }
-            obj.addHelp("旋转角度: " + Math.round(rotationDiff[2] + rotateStep) + "&#176;");
+            obj.addHelp(
+              "旋转角度: " + Math.round(rotationDiff[2] + rotateStep) + "&#176;"
+            );
             keyboardTimerId = setTimeout(() => {
               obj.removeHelp();
               isShowingMessage = false;
@@ -1092,56 +1111,36 @@ Threebox.prototype = {
           shiftDown &&
           (e.which === arrowUpKey || e.which === arrowDownKey)
         ) {
-          const scaleValue = {
-            x:obj.scale.x + 0.1, y:obj.scale.y + 0.1, z:obj.scale.z + 0.1
-          };
-          // obj.fixedZoom = 100;
-          // console.log("大小--->", obj,obj.scale, this.tb.scale);
-          const scaleStep = e.which === arrowUpKey ? 1: -1
-          maxZoom = maxZoom + scaleStep;
-          obj.fixedZoom = maxZoom;
-          // console.log("大小--->", maxZoom, obj.fixedZoom, map.transform.scale);
-          console.log("大小--->", obj.userData.maxZoom);
+          console.log(obj, map.transform.zoom, scaleZ, obj.fixedZoom)
+          if (!scaleZ) {
+            scaleZ = map.transform.zoom; // 基于地图当前的缩放比例
+          }
+          const rate = 1 / obj.userData.scale;
+          const oneStep = e.which === arrowUpKey ? 1*rate : -1*rate;
+          scaleZ = scaleZ + oneStep < map.transform.zoom ? map.transform.zoom : scaleZ + oneStep;
+          obj.fixedZoom = scaleZ;
           obj.setObjectScale(map.transform.scale);
-          // obj.setObjectScale(obj.scale.x + 1);
-          // obj.model.setObjectScale(obj.scale.x + 1);
-          // model.scale.set(2, 2, 2);
-          // obj.setObjectScale(scaleValue);
-          // obj.set({scale:scaleValue})
-          // if (map.tb.enableHelpTooltips) {
-          //   if (isShowingMessage) {
-          //     clearTimeout(keyboardTimerId);
-          //     isShowingMessage = false;
-          //   }
-          //   obj.addHelp("缩放大小: " + scaleValue);
-          //   keyboardTimerId = setTimeout(() => {
-          //     obj.removeHelp();
-          //     isShowingMessage = false;
-          //   }, keyboardTimerDelay);
-          //   isShowingMessage = true;
-          // }
-          this.tb.map.repaint = true;
+          window.tb.map.repaint = true;
 
         } else if (ctrlDown && shiftDown && rDown) {
-          const defaultOption = objectsFirstState[obj.uuid]
+          const defaultOption = objectsFirstState[obj.uuid];
           console.log("重置初始化--->11", defaultOption);
-          if(!defaultOption)return;
-          // obj.scale.set(1, 1, 1);
-          // obj.rotation.set(defaultOption.rotation.x, defaultOption.rotation.y, defaultOption.rotation.z);
-          // obj.rotation.set(this.tb.defaultOptions.rotation.x, this.tb.defaultOptions.rotation.y, this.tb.defaultOptions.rotation.z);
-        
-          // obj.fixedZoom = maxZoom;
-          // // console.log("大小--->", maxZoom, obj.fixedZoom, map.transform.scale);
-          // console.log("大小--->", obj.userData.maxZoom);
-          // obj.setObjectScale(map.transform.scale);
-          defaultOption.rotation && obj.setRotation(0
-          //   {
-          //   // x: 90, y: 0, z: 0 
-          //   // x:0, y:0, z: -defaultOption.rotation.z + 360
-          //   x:0, y:0, z: 0
-          // }
-          )
-          obj.setCoords([defaultOption?.coordinates?.[0]||0, defaultOption?.coordinates?.[1]||0, defaultOption?.height || 0]);
+          if (!defaultOption) return;
+          defaultOption.rotation &&
+            obj.setRotation({
+              // x: 90, y: 0, z: 0
+              x: 0,
+              y: 0,
+              z: -defaultOption.rotation.z,
+              // x:0, y:0, z: 0
+            });
+
+          // obj.rotateOnAxis(new THREE.Vector3(1, 0, 0), -defaultOption.rotation.z);
+          obj.setCoords([
+            defaultOption?.coordinates?.[0] || 0,
+            defaultOption?.coordinates?.[1] || 0,
+            defaultOption?.height || 0,
+          ]);
           this.tb.map.repaint = true;
         }
       }
@@ -1353,7 +1352,7 @@ Threebox.prototype = {
   },
 
   loadObj: async function loadObj(options, cb) {
-    this.defaultOptions = options
+    this.defaultOptions = options;
     this.setDefaultView(options, this.options);
     if (options.clone === false) {
       return new Promise(async (resolve) => {

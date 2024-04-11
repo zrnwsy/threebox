@@ -53,7 +53,7 @@
       var map = (window.map = new mapboxgl.Map({
         container: "map",
         style: "mapbox://styles/mapbox/streets-v11",
-        zoom: 16,
+        zoom: 13,
         center: [-8.629134, 41.157902],
         pitch: 60,
         antialias: true, // create the gl context with MSAA antialiasing, so custom layers are antialiased
@@ -83,11 +83,11 @@
               // obj: "../examples/models/Soldier.glb",
               // obj: "./models/radar/34M_17.glb", //model url
               // obj: "https://docs.mapbox.com/mapbox-gl-js/assets/34M_17/34M_17.gltf",
-              units: "meters",
-              scale: 100,
+              // units: "meters",
+              units: "scene",
+              scale: 1,
               anchor: "center",
               rotation: { x: 90, y: 0, z: 0 },
-              maxZoom:14
 						// bbox: false
             };
             function makeNaive(options) {
@@ -100,7 +100,7 @@
                       let lat = origin[1] + Math.random() * 0.4 - 0.2;
                       let alt = origin[2] + Math.random() * 0.4 - 0.2;
                       let obj = model.setCoords([lng, lat, alt]);
-                      obj.fixedZoom = 100;
+                      // obj.fixedZoom = 100;
                       window.tb.add(obj);
 
                       if (obj.animation) {
@@ -130,15 +130,19 @@
 
             // 2 .渲染单个模型
             window.tb.loadObj(options, (model) => {
-              model.setCoords(origin);
+             const obj = model.setCoords(origin);
               model.addTooltip("Your diorama model is loaded", true);
-              window.tb.add(model);
+              window.tb.add(obj);
               // console.log(tb, model, model.scale);
               // console.log("22222", model);
-              theModel =model
+              theModel =obj
             });
 
-
+            function onSelectedChange(e) {
+              const selected = e.detail.selected; //we get if the object is selected after the event
+              //if selected
+              console.log('selected? ' + selected,e);
+            }
             window.tb.loadObj({
               type: "glb",
               obj: "../examples/models/vehicles/truck.glb",
@@ -149,12 +153,13 @@
               scale: 100,
               anchor: "center",
               rotation: { x: 90, y: 0, z: 0 },
-              maxZoom:14
 						// bbox: false
             }, (model) => {
-              model.setCoords([-8.629134, 41.155700, 0]);
+             const  obj = model.setCoords([-8.629134, 41.155700, 0]);
               model.addTooltip("saxas", true);
               window.tb.add(model);
+
+              obj.addEventListener('SelectedChange', onSelectedChange, false);
               // console.log(tb, model, model.scale);
               // console.log("22222", model);
               // theModel =model
@@ -167,14 +172,12 @@
         return customLayer3D;
       }
 
-      var maxZoom = 15;
+    var maxZoom = 16;
 		function changeScale(step) {
-      // console.log(theModel)
-			maxZoom = maxZoom + step;
+			maxZoom = maxZoom + step ;
 			theModel.fixedZoom = maxZoom;
+      console.log(maxZoom)
 			theModel.setObjectScale(map.transform.scale);
-			// console.log(theModel)
-			// console.log('1----',e,api.maxZoom, map.transform.scale)
       window.tb.map.repaint = true;
 		}
 
